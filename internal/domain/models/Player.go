@@ -4,5 +4,7 @@ import "gorm.io/gorm"
 
 type Player struct {
 	gorm.Model
-	userID string `json:"user_id"`
+	UserID     string `json:"user_id"`
+	InsideRoom bool
+	RoomID     string
 }
