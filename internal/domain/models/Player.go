@@ -1,10 +1,9 @@
 package models
 
-import "gorm.io/gorm"
+import "github.com/gorilla/websocket"
 
 type Player struct {
-	gorm.Model
-	UserID     string `json:"user_id"`
-	InsideRoom bool
-	RoomID     string
+	UserID string `json:"user_id"`
+	RoomID string
+	Conn   *websocket.Conn
 }
