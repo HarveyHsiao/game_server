@@ -3,41 +3,53 @@ package usecases
 import (
 	"fmt"
 	"game_server/internal/domain/models"
+	"game_server/internal/domain/repositories"
+	"github.com/gorilla/websocket"
 	"sync"
 	"time"
 )
 
 type RoomUsecase interface {
-	CreateRoom() *models.Room
+	CreateRoom() (*models.Room, error)
 	JoinRoom(roomID string, player *models.Player) error
 	LeftRoom(player *models.Player) error
 	GetRoom(roomID string) (*models.Room, error)
+	BroadCast(msg []byte, player *models.Player) error
 }
 
 type roomUsecase struct {
-	rooms map[string]*models.Room
-	mu    sync.Mutex
+	roomRepo repositories.RoomRepository
+	rooms    map[string]*models.Room
+	mu       sync.Mutex
 }
 
-func NewRoomUsecase() RoomUsecase {
+func NewRoomUsecase(roomRepo repositories.RoomRepository) RoomUsecase {
 	return &roomUsecase{
-		rooms: make(map[string]*models.Room),
+		roomRepo: roomRepo,
+		rooms:    make(map[string]*models.Room),
 	}
 }
 
-func (u *roomUsecase) CreateRoom() *models.Room {
+func (u *roomUsecase) CreateRoom() (*models.Room, error) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	roomID := generateRoomID()
-	room := &models.Room{
+
+	room, exist := u.rooms[roomID]
+
+	if exist {
+		return room, fmt.Errorf("room has existed")
+	}
+
+	newRoom := &models.Room{
 		ID:      generateRoomID(),
 		Players: make(map[string]*models.Player),
 	}
 
-	u.rooms[roomID] = room
+	u.rooms[roomID] = newRoom
 
-	return room
+	return newRoom, nil
 }
 
 func (u *roomUsecase) JoinRoom(roomID string, player *models.Player) error {
@@ -45,16 +57,19 @@ func (u *roomUsecase) JoinRoom(roomID string, player *models.Player) error {
 	defer u.mu.Unlock()
 
 	room, exist := u.rooms[roomID]
-
-	if !exist {
+	
+	if !exist || room == nil {
 		return fmt.Errorf("room not found")
+	}
+
+	if room.Players == nil {
+		return fmt.Errorf("room is empty")
 	}
 
 	if len(room.Players) >= 4 {
 		return fmt.Errorf("room is full")
 	}
 
-	player.InsideRoom = true
 	player.RoomID = roomID
 	room.Players[player.UserID] = player
 
@@ -65,10 +80,6 @@ func (u *roomUsecase) LeftRoom(player *models.Player) error {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	if !player.InsideRoom {
-		return fmt.Errorf("player is not inside room")
-	}
-
 	room, exist := u.rooms[player.RoomID]
 
 	if !exist {
@@ -76,7 +87,6 @@ func (u *roomUsecase) LeftRoom(player *models.Player) error {
 	}
 
 	delete(room.Players, player.UserID)
-	player.InsideRoom = false
 
 	if len(room.Players) == 0 {
 		delete(u.rooms, room.ID)
@@ -97,6 +107,23 @@ func (u *roomUsecase) GetRoom(roomID string) (*models.Room, error) {
 	}
 
 	return room, nil
+}
+
+func (u *roomUsecase) BroadCast(msg []byte, player *models.Player) error {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	room, exist := u.rooms[player.RoomID]
+
+	if !exist {
+		return fmt.Errorf("room ID: %s doesn't existed", room.ID)
+	}
+
+	for _, roomPlayer := range room.Players {
+		roomPlayer.Conn.WriteMessage(websocket.TextMessage, msg)
+	}
+
+	return nil
 }
 
 // random RoomID
