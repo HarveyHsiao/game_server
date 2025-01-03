@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"game_server/internal/app/usecases"
 	"game_server/internal/domain/models"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 )
 
@@ -35,11 +37,12 @@ func (h *roomHandler) CreateRoom(c *gin.Context) {
 }
 
 func (h *roomHandler) JoinRoom(c *gin.Context) {
-	roomID := c.Param("id")
+	roomID := c.Query("id")
 
 	_, err := h.roomUsecase.GetRoom(roomID)
 
 	if err != nil {
+		fmt.Println(roomID)
 		c.JSON(http.StatusNotFound, gin.H{"error": err})
 		return
 	}
@@ -47,7 +50,9 @@ func (h *roomHandler) JoinRoom(c *gin.Context) {
 	conn, socketErr := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 
 	if socketErr != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": socketErr})
+		fmt.Println("aa")
+		log.Println(socketErr)
+		//c.JSON(http.StatusNotFound, gin.H{"error": socketErr})
 		return
 	}
 
@@ -62,6 +67,7 @@ func (h *roomHandler) JoinRoom(c *gin.Context) {
 	err = h.roomUsecase.JoinRoom(roomID, player)
 
 	if err != nil {
+		fmt.Println("ccc")
 		c.JSON(http.StatusNotFound, gin.H{"error": err})
 		return
 	}

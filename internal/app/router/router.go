@@ -28,6 +28,10 @@ func InitRouter() *gin.Engine {
 		roomHandler.CreateRoom(context)
 	})
 
+	roomApi.GET("/join", func(context *gin.Context) {
+		roomHandler.JoinRoom(context)
+	})
+
 	//roomApi.POST("/")
 
 	return r

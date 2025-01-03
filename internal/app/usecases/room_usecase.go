@@ -47,7 +47,7 @@ func (u *roomUsecase) CreateRoom() (*models.Room, error) {
 		Players: make(map[string]*models.Player),
 	}
 
-	u.rooms[roomID] = room
+	u.rooms[roomID] = newRoom
 
 	return newRoom, nil
 }
@@ -57,9 +57,13 @@ func (u *roomUsecase) JoinRoom(roomID string, player *models.Player) error {
 	defer u.mu.Unlock()
 
 	room, exist := u.rooms[roomID]
-
-	if !exist {
+	
+	if !exist || room == nil {
 		return fmt.Errorf("room not found")
+	}
+
+	if room.Players == nil {
+		return fmt.Errorf("room is empty")
 	}
 
 	if len(room.Players) >= 4 {
@@ -126,4 +130,3 @@ func (u *roomUsecase) BroadCast(msg []byte, player *models.Player) error {
 func generateRoomID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
-
